@@ -1,0 +1,84 @@
+#include <DallasTemperature.h>
+#include <OneWire.h>
+#include <Wire.h> 
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x3F,16,2);
+
+#define ONE_WIRE_BUS 7
+OneWire oneWire(ONE_WIRE_BUS); 
+DallasTemperature sensors(&oneWire);
+
+
+int trigPin = 8;    
+int echoPin = 9;
+int tempPin = 10;
+//int motorPin = 6;
+long duration, cm;
+
+
+void setup() {
+  
+ Serial.begin (9600);
+ 
+ Serial.println("DONE"); 
+ pinMode(trigPin, OUTPUT);
+ pinMode(echoPin, INPUT);
+ pinMode(tempPin, INPUT);
+// pinMode(motorPin, OUTPUT);
+
+
+ lcd.begin();
+ lcd.backlight();
+ lcd.setCursor(6,0);
+ lcd.print("cm");
+ lcd.setCursor(6,1);
+ lcd.print("*C");
+ 
+}
+
+void loop() {
+
+  lcd.clear();
+//  analogWrite(motorPin, 255);
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  
+  
+  pinMode(echoPin, INPUT);
+  duration = pulseIn(echoPin, HIGH);
+  cm = (duration/2) / 29,1;
+
+//  Serial.print(cm);
+//  Serial.print("cm");
+
+//  Serial.println();
+//  delay(1000); 
+
+
+ sensors.begin(); 
+ sensors.requestTemperatures(); 
+// Serial.print(sensors.getTempCByIndex(0));   
+// Serial.print("*C");
+// Serial.println();
+// delay(1000); 
+
+   lcd.setCursor(0,0);
+   lcd.print(cm);
+   
+   
+   
+   lcd.setCursor(0,1);
+   lcd.print(sensors.getTempCByIndex(0));
+   
+   delay(5000);
+   
+   
+   
+  
+
+}
