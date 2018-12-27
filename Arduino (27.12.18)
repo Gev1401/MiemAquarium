@@ -1,0 +1,254 @@
+#include <SparkFun_APDS9960.h>
+#include <DallasTemperature.h>
+#include <OneWire.h>
+#include <Wire.h> 
+#include <LiquidCrystal_I2C.h>
+#include <iarduino_AM2320.h>
+
+iarduino_AM2320 sensor;
+
+LiquidCrystal_I2C lcd(0x3F,16,2);
+
+#define ONE_WIRE_BUS 7
+OneWire oneWire(ONE_WIRE_BUS); 
+DallasTemperature sensors(&oneWire);
+
+SparkFun_APDS9960 apds = SparkFun_APDS9960();
+uint16_t ambient_light = 0;
+uint16_t red_light = 0;
+uint16_t green_light = 0;
+uint16_t blue_light = 0;
+uint8_t proximity=0;
+uint8_t i=0;
+
+
+
+int trigPin = 8;    
+int echoPin = 9;
+int tempPin = 10;
+//int motorPin = 6;
+long duration, cm;
+long value;
+
+void setup() {
+  
+ Serial.begin (9600);
+ sensor.begin();
+ 
+ Serial.println("DONE"); 
+ 
+ pinMode(trigPin, OUTPUT);
+ pinMode(echoPin, INPUT);
+ pinMode(tempPin, INPUT);
+// pinMode(motorPin, OUTPUT);
+
+
+ lcd.begin();
+ lcd.backlight();
+
+
+
+   if ( apds.init() ) {
+    Serial.println(F("APDS-9960 initialization complete"));
+  } else {
+    Serial.println(F("Something went wrong during APDS-9960 init!"));
+  }
+
+  if ( apds.enableLightSensor(false) ) {
+    Serial.println(F("Light sensor is now running"));
+  } else {
+    Serial.println(F("Something went wrong during light sensor init!"));
+  }
+  
+
+
+  if ( !apds.setProximityGain(PGAIN_2X) ) {
+    Serial.println(F("Something went wrong trying to set PGAIN"));
+  }
+  
+  if ( apds.enableProximitySensor(false) ) {
+    Serial.println(F("Proximity sensor is now running"));
+  } else {
+    Serial.println(F("Something went wrong during sensor init!"));
+  }
+
+if(apds.setGestureGain(GGAIN_2X)){                              // ≈сли установлен коэффициент усилени€ приЄмника в режиме обнаружени€ жестов, то ... 
+          Serial.println("Set gain OK!");                       // ¬ыводим сообщение об успешной установке коэффициента усилени€ приЄмника
+    }else{Serial.println("Set gain ERROR!");}                   // »наче, выводим сообщение об ошибке при установке коэффициента усилени€ приЄмника
+                                                                // ѕрочитать установленный коэффициент усилени€ приЄмника можно так: uint8_t i = apds.getGestureGain(); // в переменную i сохранитс€ значение: GGAIN_1X, или GGAIN_2X, или GGAIN_4X, или GGAIN_8X
+//  ”станавливаем силу тока драйвера » -светодиода:             // ƒоступные значени€: 100мј, 50мј, 25мј, 12.5мј (LED_DRIVE_100MA, LED_DRIVE_50MA, LED_DRIVE_25MA, LED_DRIVE_12_5MA). „ем выше сила тока, тем выше чувствительность.
+    if(apds.setGestureLEDDrive(LED_DRIVE_100MA)){               // ≈сли устанавлена сила тока драйвера (€ркость) » -светодиода дл€ обнаружени€ жестов, то ...
+          Serial.println("Set LED drive OK!");                  // ¬ыводим сообщение об успешной установке силы тока драйвера
+    }else{Serial.println("Set LED drive ERROR!");}              // »наче, выводим сообщение об ошибке при установке силы тока драйвера
+                                                                // ѕрочитать установленную силу тока можно так: uint8_t i = apds.getGestureLEDDrive(); // в переменную i сохранитс€ значение: LED_DRIVE_100MA, или LED_DRIVE_50MA, или LED_DRIVE_25MA, или LED_DRIVE_12_5MA
+//  –азрешаем режим обнаружение жестов:                         //
+    if(apds.enableGestureSensor(false)){                        // ≈сли механизм обнаружени€ жестов (false - без прерываний на выходе INT) запущен, то ...
+          Serial.println("Start gesture sensor OK!");           // ¬ыводим сообщение об успешном запуске механизма обнаружени€ жестов
+    }else{Serial.println("Start gesture sensor ERROR!");
+    
+
+}
+
+}
+
+void loop() {
+
+//  lcd.clear();
+
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  pinMode(echoPin, INPUT);
+  duration = pulseIn(echoPin, HIGH);
+  cm = (duration/2) / 29,1;
+
+//  Serial.print(cm);
+//  Serial.print("cm");
+
+//  Serial.println();
+//  delay(1000); 
+
+
+  sensors.begin(); 
+  sensors.requestTemperatures(); 
+// Serial.print(sensors.getTempCByIndex(0));   
+// Serial.print("*C");
+// Serial.println();
+// delay(1000); 
+
+//   lcd.setCursor(0,0);
+//   lcd.print(cm);
+   
+//   lcd.setCursor(0,1);
+//   lcd.print(sensors.getTempCByIndex(0));
+   
+    am2320();
+
+    ambient();
+    handleGesture();
+    choose_param(i);
+    lcd_write(i);
+    delay(200);
+}
+
+
+
+void am2320()
+{
+  switch(sensor.read()){                                                        // „итаем показани€ датчика.
+    case AM2320_OK:         Serial.println((String) "CEHCOP AM2320:  T=" + sensor.tem + "*C, PH=" + sensor.hum + "%");  break;
+    case AM2320_ERROR_LEN:  Serial.println("OTIIPABKA HEBO3M.");     break;     // объем передаваемых данных превышает буфер I2C
+    case AM2320_ERROR_ADDR: Serial.println("HET CEHCOPA");           break;     // получен NACK при передаче адреса датчика
+    case AM2320_ERROR_DATA: Serial.println("OTIIPABKA HEBO3M.");     break;     // получен NACK при передаче данных датчику
+    case AM2320_ERROR_SEND: Serial.println("OTIIPABKA HEBO3M.");     break;     // ошибка при передаче данных
+    case AM2320_ERROR_READ: Serial.println("HET OTBETA OT CEHCOPA"); break;     // получен пустой ответ датчика
+    case AM2320_ERROR_ANS:  Serial.println("OTBET HEKOPPEKTEH");     break;     // ответ датчика не соответствует запросу
+    case AM2320_ERROR_LINE: Serial.println("HEPABEHCTBO CRC");       break;     // помехи в линии св€зи (не совпадает CRC)
+  }
+}
+    
+void handleGesture() {
+       if(apds.isGestureAvailable()){                              // ≈сли зафиксировано движение, то ...
+        switch(apds.readGesture()){                             // —вер€ем значение соответствующее жесту ...
+            case DIR_UP:    Serial.println("UP"   ); break;     // «афиксировано движение вперЄд или вверх (зависит от положени€ датчика)
+            case DIR_DOWN:  Serial.println("DOWN" ); break;     // «афиксировано движение назад или вниз (зависит от положени€ датчика)
+            case DIR_LEFT:  Serial.println("LEFT" );
+            
+            break;     // «афиксировано движение влево
+           
+            case DIR_RIGHT: Serial.println("RIGHT");
+            
+             
+            break;     // «афиксировано движение вправо
+            case DIR_NEAR:  Serial.println("NEAR" ); break;     // «афиксировано движение к датчику
+            case DIR_FAR:   Serial.println("FAR"  ); break;     // «афиксировано движение от датчика
+            default:        Serial.println("NONE" ); break;     // «афиксировано движение, но жест не опознан
+        }
+  
+    }
+ Serial.println();
+   }
+   
+void ambient() 
+{
+      apds.readAmbientLight(ambient_light);
+      apds.readRedLight(red_light);
+      apds.readGreenLight(green_light);     
+      apds.readBlueLight(blue_light);
+      apds.readProximity(proximity);
+      Serial.print("Ambient: ");
+      Serial.print(ambient_light);
+      Serial.print(" R: ");
+      Serial.print(red_light);
+      Serial.print(" G: ");
+      Serial.print(green_light);
+      Serial.print(" B: ");
+      Serial.print(blue_light);
+      Serial.print(" Prox: ");
+      Serial.println(proximity);
+      Serial.println();
+}
+
+
+   
+   void choose_param(int i) {
+       if(apds.isGestureAvailable()){                              // ≈сли зафиксировано движение, то ...
+        switch(apds.readGesture()){                             // —вер€ем значение соответствующее жесту ...
+            case DIR_LEFT:  
+            if (i=0) {i=4;}
+            else i--;
+            break;     // «афиксировано движение влево
+           
+            case DIR_RIGHT: 
+            if (i=4) {i=0;}
+            else i++;
+             
+            break;     // «афиксировано движение вправо
+
+            default:        Serial.println("NONE" ); break;     // «афиксировано движение, но жест не опознан
+        }
+  
+    }
+ Serial.println();
+   }
+   
+   
+   void lcd_write(int i)
+   {
+    switch(i){
+        case 0: 
+        value = cm;
+        lcd.setCursor(0,5);
+        lcd.print("cm");
+        break;
+
+        case 1: 
+        value = sensor.hum;
+        lcd.setCursor(0,5);
+        lcd.print("%");
+        break;
+
+        case 2: 
+        value = sensors.getTempCByIndex(0);
+        lcd.setCursor(0,5);
+        lcd.print("*С");
+        break;
+
+        case 3: 
+        lcd.setCursor(0,0);
+        lcd.print("pusto");
+        break;
+
+        case 4: 
+        lcd.setCursor(0,0);
+        lcd.print("pusto");
+        break;
+    }
+    lcd.setCursor(0,0);
+    lcd.print("     ");
+    lcd.print(value);
+   }
+   
+  
