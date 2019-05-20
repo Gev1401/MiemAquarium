@@ -1,0 +1,522 @@
+#include <Bounce2.h>
+#include <DallasTemperature.h>
+#include <OneWire.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <iarduino_AM2320.h>
+#include <Servo.h>
+#include <iarduino_RTC.h>
+
+Servo servo;
+iarduino_AM2320 sensor;
+//iarduino_RTC time(RTC_DS1307);
+LiquidCrystal_I2C lcd(0x3F, 16, 2);
+#define ONE_WIRE_BUS 10
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+
+
+int param = 0;
+
+int flag_light=0;
+int flag_heater=0;
+int ch_temp_flag=0;
+int ct_temp_flag=1;
+int rl_light= 7;
+int rl_heater= 6;
+int all_light_on=1;
+int all_light_off=1;
+int all_feed=1;
+int ang = 0;
+int trigPin = 8;
+int echoPin = 9;
+int tempPin = 10;
+int bt_power=13;
+int bt_val=0;
+long duration, cm,cmg;
+long value;
+int temp = 24;
+int sigma = 5;
+//int ton_time=10;
+//int toff_time=21;
+//int feed_time=14;
+
+int right_button=2;
+int left_button=3;
+int light_button=4;
+int feed_button=5;
+int set_up_button=12;
+
+int right_button_state=0;
+int last_right_button_state=0;
+
+int left_button_state=0;
+int last_left_button_state=0;
+
+int light_button_state=0;
+int last_light_button_state=0;
+
+int feed_button_state=0;
+int last_feed_button_state=0;
+
+int set_button_state=0;
+int last_set_button_state=0;
+
+Bounce debouncer_right=Bounce();
+
+Bounce debouncer_left=Bounce();
+
+Bounce debouncer_light=Bounce();
+
+Bounce debouncer_feed=Bounce();
+
+Bounce debouncer_set=Bounce();
+
+void setup() {
+
+  Serial.begin (9600);
+
+  sensors.begin();
+  sensor.begin();
+  Serial.print('reset');
+  servo.attach(11);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  pinMode(rl_light, OUTPUT);
+  pinMode(rl_heater, OUTPUT);
+  pinMode(bt_power, OUTPUT);
+//  debouncer_right.attach(right_button);
+//  debouncer_right.interval(500);
+//  debouncer_left.attach(left_button);
+//  debouncer_left.interval(500);
+//  debouncer_light.attach(light_button);
+//  debouncer_light.interval(500);
+//  debouncer_feed.attach(feed_button);
+//  debouncer_feed.interval(500);
+//  debouncer_set.attach(set_up_button);
+//  debouncer_set.interval(500);
+  pinMode(right_button, INPUT);
+  pinMode(light_button, INPUT);
+  pinMode(feed_button, INPUT);
+  pinMode(set_up_button, INPUT);
+  digitalWrite(rl_light, LOW);
+  digitalWrite(rl_heater, LOW);
+  digitalWrite(bt_power, HIGH);
+  lcd.begin();
+  lcd.backlight();
+  servo.write(150);
+
+//  time.begin();
+
+//  time.settime(0,15,16,18,05,19,6);
+}
+void loop() {
+  lcd.clear();
+  lcd_write(param);
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  duration = pulseIn(echoPin, HIGH);
+  cm = ((duration / 2) / 29.1);
+  cmg = 35-cm;
+  bt_val=0;
+
+//  Serial.print("Servo: ");
+//  Serial.print(ang);
+//  Serial.println();
+//  Serial.print("Temp: ");
+//  Serial.print(sensors.getTempCByIndex(0));
+//  Serial.println();
+//  Serial.print("Level: ");
+//  Serial.print(cmg);  
+//  Serial.println();
+//  Serial.print("STATE:      ");
+//  Serial.print(debouncer_right.read());
+  
+ 
+  sensors.requestTemperatures();
+
+  delay(1000);
+
+
+  am2320();
+
+//  time.gettime();
+
+//  debouncer_right.update();
+//  debouncer_left.update();
+//  debouncer_light.update();
+//  debouncer_feed.update();
+//  debouncer_set.update();
+  
+  switch_button(int(Serial.read()-'0'));
+  bt_val=read_button();
+  switch_button(bt_val);
+  Serial.println(read_button());
+  control_temp(sensors.getTempCByIndex(0),temp,sigma);
+//  check_time();
+
+}
+
+
+
+void am2320()
+{
+  switch (sensor.read()) {                                                      // „итаем показани€ датчика.
+//    case AM2320_OK:         Serial.println((String) "CEHCOP AM2320:  T=" + sensor.tem + "*C, PH=" + sensor.hum + "%");  break;
+//    case AM2320_ERROR_LEN:  Serial.println("OTIIPABKA HEBO3M.");     break;     // объем передаваемых данных превышает буфер I2C
+//    case AM2320_ERROR_ADDR: Serial.println("HET CEHCOPA");           break;     // получен NACK при передаче адреса датчика
+//    case AM2320_ERROR_DATA: Serial.println("OTIIPABKA HEBO3M.");     break;     // получен NACK при передаче данных датчику
+//    case AM2320_ERROR_SEND: Serial.println("OTIIPABKA HEBO3M.");     break;     // ошибка при передаче данных
+//    case AM2320_ERROR_READ: Serial.println("HET OTBETA OT CEHCOPA"); break;     // получен пустой ответ датчика
+//    case AM2320_ERROR_ANS:  Serial.println("OTBET HEKOPPEKTEH");     break;     // ответ датчика не соответствует запросу
+//    case AM2320_ERROR_LINE: Serial.println("HEPABEHCTBO CRC");       break;     // помехи в линии св€зи (не совпадает CRC)
+  }
+}
+
+
+
+
+int choose_param(int i,bool plus) {
+  if (ch_temp_flag)
+  {
+    i=6+ch_temp_flag-1;
+
+    return i;
+  }
+
+  if (plus) {
+    if (i >= 5) { i = 0; }
+    else { i += 1; }
+    return i;
+  }
+  else
+  {
+    if (i == 0) { i = 5; }
+    else { i -= 1; }
+    return i;
+  }
+}
+
+void lcd_write(int i)
+{
+
+  switch (i) {
+    case 0:
+
+          lcd.setCursor(0,0);
+          lcd.print("Water level:");
+          lcd.setCursor(0,1);
+          lcd.print(cmg);
+          lcd.setCursor(7,1);
+          lcd.print("cm");
+          break;
+
+    case 1:
+
+          lcd.setCursor(0,0);
+          lcd.print("Humidity:");
+          lcd.setCursor(0,1);
+          lcd.print(sensor.hum);
+          lcd.setCursor(7,1);
+          lcd.print("%");
+          break;
+
+    case 2:
+
+      lcd.setCursor(0,0);
+          lcd.print("Water temp.:");
+          lcd.setCursor(0,1);
+          lcd.print(sensors.getTempCByIndex(0));
+          lcd.setCursor(7,1);
+          lcd.print("*C");
+          break;
+
+    case 3:
+
+          lcd.setCursor(0,0);
+          lcd.print("Arduino temp.:");
+          lcd.setCursor(0,1);
+          lcd.print(sensor.tem);
+          lcd.setCursor(7,1);
+          lcd.print("*C");
+          break;
+
+    case 4:
+          lcd.setCursor(0, 0);
+          if (flag_heater==0)
+          {
+            lcd.print("Heater OFF");
+          }
+          else lcd.print("Heater ON");
+          break;
+
+    case 5:
+      lcd.setCursor(0,0);
+//      lcd.print(time.gettime("d-m-Y"));
+      lcd.setCursor(0,1);
+//      lcd.print(time.gettime("H:i, D"));
+
+          break;
+
+
+    case 6:
+      lcd.setCursor(0,0);
+      lcd.print("Choose temp:");
+      lcd.setCursor(0,1);
+      lcd.print(temp);
+
+
+          break;
+
+
+    case 7:
+      lcd.setCursor(0,0);
+      lcd.print("Choose temp range:");
+      lcd.setCursor(0,1);
+      lcd.print(sigma);
+
+          break;
+
+          
+    case 8:
+      lcd.setCursor(0,0);
+      lcd.print("Choose time:");
+      lcd.setCursor(0,1);
+//      lcd.print(ton_time);
+
+          break;
+
+          
+     case 9:
+      lcd.setCursor(0,0);
+      lcd.print("Choose time:");
+      lcd.setCursor(0,1);
+//      lcd.print(toff_time);
+
+          break;
+
+     case 10:
+      lcd.setCursor(0,0);
+      lcd.print("Choose feed time:");
+      lcd.setCursor(0,1);
+//      lcd.print(feed_time);
+
+          break;
+  }
+
+}
+
+int ch_flag(int flag, int rl)
+{
+  if (flag==1)
+  {flag=0;}
+
+  else {flag=1;}
+
+  if (flag==1)
+  {digitalWrite(rl,LOW);}
+  else {digitalWrite(rl,HIGH);}
+
+  return flag;
+}
+
+
+void switch_button(int i) {
+
+
+  switch (i) {
+    case 2:
+      if (ch_temp_flag){
+        switch (ch_temp_flag)
+        {
+          case 1:
+            temp+=1;
+                break;
+          case 2:
+            sigma+=1;
+                break;
+//          case 3:
+//            ton_time+=1;
+//            break;
+//          case 4:
+//            toff_time+=1;
+//            break;
+//          case 5:
+//            feed_time+=1;
+//            break;
+            
+        }
+      }
+      else param = choose_param(param, true);
+          break;
+
+    case 1:
+      if (ch_temp_flag){
+        switch (ch_temp_flag)
+        {
+          case 1:
+            temp-=1;
+                break;
+          case 2:
+            sigma-=1;
+                break;
+//          case 3:
+//            ton_time-=1;
+//            break;
+//          case 4:
+//            toff_time-=1;
+//            break;
+//          case 5:
+//            feed_time-=1;
+//            break;
+        }
+      }
+      else param = choose_param(param, false);
+          break;
+
+    case 3:
+
+          flag_light = ch_flag(flag_light, rl_light);
+          break;
+
+    case 4:
+
+          ang = 80;
+          servo.write(ang);
+          delay(700);
+          ang = 130;
+          servo.write(ang);
+          break;
+    case 5:
+
+      if (ch_temp_flag==6)
+      {
+        ch_temp_flag=0;
+      }
+      else
+      {
+        ch_temp_flag+=1;
+      }
+          param = choose_param(param, true);
+          break;
+  }
+}
+
+
+void control_temp(int sen_temp,int temp,int sigma)
+{
+ if ((temp-0.6*sigma>sen_temp)&&ct_temp_flag)
+  {
+    digitalWrite(rl_heater,HIGH);
+    lcd.clear();
+    lcd.print("Heater ON");
+    ct_temp_flag=0;
+    delay(1500);
+  }
+  else if ((temp<sen_temp)&&!ct_temp_flag)
+  {
+    digitalWrite(rl_heater,LOW);
+    lcd.clear();
+    lcd.print("Heater OFF");
+    ct_temp_flag=1;
+    delay(1500);
+
+  }
+  else if (temp+0.6*sigma<sen_temp)
+  {
+    digitalWrite(rl_light,LOW);
+    flag_light=0;
+  }
+}
+  
+
+//void check_time()
+//{
+//  if (time.Hours==feed_time && all_feed==1)
+//  {
+//    ang += 50;
+//    servo.write(ang);
+//    delay(200);
+//    ang -= 50;
+//    servo.write(ang);
+//    all_feed=0;
+//  }
+//
+//  if (time.Hours>=ton_time && all_light_on && time.Hours<=toff_time)
+//  {
+//    digitalWrite(rl_light,LOW);
+//    flag_light=1;
+//    all_light_on=0;
+//  }
+//
+//  if (time.Hours>=toff_time && all_light_off && time.Hours<=ton_time)
+//  {
+//    digitalWrite(rl_light,HIGH);
+//    flag_light=0;
+//    all_light_off=0;
+//  }
+//
+//  if (time.Hours==0 && time.minutes==0)
+//  {
+//    all_light_off=1;
+//    all_light_on=1;
+//    all_feed=1;
+//  }
+//}
+
+int read_button()
+{
+  right_button_state=digitalRead(right_button);
+  left_button_state=digitalRead(left_button);
+  light_button_state=digitalRead(light_button);
+  feed_button_state=digitalRead(feed_button);
+  set_button_state=digitalRead(set_up_button);
+  if (right_button_state!=last_right_button_state)  {
+    
+    last_right_button_state==right_button_state;
+    
+    if(right_button_state==HIGH)
+    
+    return 1;
+    else return 0;
+  }  
+  if (left_button_state!=last_left_button_state)  {
+    
+    last_left_button_state==left_button_state;
+    
+    if(left_button_state==HIGH)
+    
+    return 2;
+    else return 0;
+  }
+  if (light_button_state!=last_light_button_state)  {
+    Serial.print("voshla");
+    last_light_button_state==light_button_state;
+    
+    if(light_button_state==HIGH)
+   { Serial.println("vishla");
+    return 3;}
+    else return 0;
+  }
+  if (feed_button_state!=last_feed_button_state)  {
+    
+    last_feed_button_state==feed_button_state;
+    
+    if(feed_button_state==HIGH)
+    
+    return 4;
+    else return 0;
+  }
+ if (set_button_state!=last_set_button_state)  {
+    
+    last_set_button_state==set_button_state;
+    
+    if(set_button_state==HIGH)
+    
+    return 5;
+    else return 0;
+  }
+  }
